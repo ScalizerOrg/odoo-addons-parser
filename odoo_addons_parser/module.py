@@ -115,6 +115,11 @@ class ModuleParser:
         data = pyfile.to_dict()
         for model in data["models"].values():
             key = model.get("name") or model.get("inherit")
+            if isinstance(key, list):
+                # Data model declared without `_name` but with `_inherit = [...]`,
+                # e.g. `_inherit = ['res.partner']`, considers - like Odoo - first
+                # element as current model name
+                key = key[0]
             if key not in self.models:
                 self.models.setdefault(key, {}).update(model)
             else:
@@ -122,6 +127,13 @@ class ModuleParser:
                     self.models[key].setdefault("fields", {}).update(model["fields"])
                 if model.get("methods"):
                     self.models[key].setdefault("methods", {}).update(model["methods"])
+                # Handle cases where more than one file declare the same data model
+                # in current scanned module, and one of them is the original
+                # declaration w/o inheritance).
+                #   => Consider the data model as original/new for current module.
+                if model.get("name") == key and self.models[key].get("inherit") == key:
+                    self.models[key]["name"] = key
+                    del self.models[key]["inherit"]
 
     def _run_scan_xml(self, file_path: os.PathLike):
         try:

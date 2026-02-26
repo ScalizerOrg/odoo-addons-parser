@@ -243,9 +243,19 @@ class OdooModel:
                     # _name, _inherit, _description, _auto, _order...
                     if isinstance(elt.value, ast.Constant):
                         return elt.value.value
-                    # _inherit
-                    if isinstance(elt.value, ast.Constant):
-                        return elt.value.value
+                    #  _inherit = [...]
+                    if isinstance(elt.value, ast.List):
+                        values = []
+                        for e in elt.value.elts:
+                            # e.g. = ['my.model']
+                            if isinstance(e, ast.Constant):
+                                values.append(e.value)
+                            # e.g. = [_name]
+                            if isinstance(e, ast.Name):
+                                value = OdooModel._get_attr_value(ast_cls, e.id)
+                                if value:
+                                    values.append(value)
+                        return values
                     # _inherits
                     if isinstance(elt.value, ast.Dict):
                         # iterate on dict keys/values
@@ -298,7 +308,7 @@ class OdooModel:
         }
         if self.auto is not None:
             data["auto"] = self.auto
-        for attr in ("name", "inherit", "inherits", "fields", "methods"):
+        for attr in ("name", "inherit", "inherits", "fields", "methods", "order"):
             if getattr(self, attr):
                 data[attr] = getattr(self, attr)
         return data

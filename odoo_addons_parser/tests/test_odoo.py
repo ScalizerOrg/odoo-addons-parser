@@ -67,3 +67,33 @@ class TestOdoo(common.CommonCase):
             self.assertIn("Model", framework_models)
             self.assertIn("TransientModel", framework_models)
             self.assertIn("res.partner", list(data["base"]["models"]))
+            # 'res.partner' and 'res.users' are declared several times in 'base'
+            # module (one with '_name' and another ones with '_inherit'), but it's
+            # not considered as inherited at the module level (ignoring any use
+            # of '_inherit')
+            for model in ("res.partner", "res.users"):
+                record = data["base"]["models"][model]
+                self.assertIn("name", record)
+                self.assertTrue(record["name"], model)
+                self.assertNotIn(model, record.get("inherit", ""))
+            # While in 'sale' it is inheriting 'res.partner'
+            sale_res_partner = data["sale"]["models"]["res.partner"]
+            self.assertNotIn("name", sale_res_partner)
+            self.assertIn("inherit", sale_res_partner)
+            self.assertIn("res.partner", sale_res_partner["inherit"])
+
+    def test_to_dict_merge_base_models_into_base_module(self):
+        version = ODOO_VERSIONS[-1]
+        folder_path = self.download_path.joinpath(f"odoo-{version}")
+        # Disable code_stats to make tests faster
+        # + collect BaseModel, Model, TransientModel into 'base' module
+        parser = OdooParser(folder_path, code_stats=False, base_models_key="base")
+        data = parser.to_dict()
+        self.assertNotIn("__odoo__", data)
+        self.assertIn("base", data)
+        models = list(data["base"]["models"])
+        self.assertIn("BaseModel", models)
+        self.assertIn("Model", models)
+        self.assertIn("TransientModel", models)
+        self.assertIn("res.partner", models)
+        self.assertIn("base", models)
