@@ -134,6 +134,10 @@ class ModuleParser:
                 if model.get("name") == key and self.models[key].get("inherit") == key:
                     self.models[key]["name"] = key
                     del self.models[key]["inherit"]
+                    # Keep the parents and delegations of the original declaration
+                    for attr in ("inherit", "inherits"):
+                        if model.get(attr):
+                            self.models[key][attr] = model[attr]
 
     def _run_scan_xml(self, file_path: os.PathLike):
         try:
