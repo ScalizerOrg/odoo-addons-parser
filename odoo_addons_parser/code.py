@@ -317,19 +317,26 @@ class OdooModel:
 class OdooField:
     """Odoo field representation."""
 
-    def __init__(self, pyfile: PyFile, ast_cls: ast.Assign):
+    def __init__(self, pyfile: PyFile, ast_cls: typing.Union[ast.Assign, ast.AnnAssign]):
         self.pyfile = pyfile
         assert self.is_field(ast_cls)
-        self.name = ast_cls.targets[0].id
+        self.name = self._target(ast_cls).id
         self.type_ = self._extract_type(ast_cls)
         self.relation = self._extract_relation(ast_cls)
         self.lineno, self.end_lineno = ast_cls.lineno, ast_cls.end_lineno
         self.code = "".join(self.pyfile.lines[self.lineno - 1 : self.end_lineno])
 
+    @staticmethod
+    def _target(ast_cls: typing.Union[ast.Assign, ast.AnnAssign]) -> ast.expr:
+        # 'name = fields.Char()', or with a type annotation (Odoo 19): 'partner_id: ResPartner = fields.Many2one()'
+        return ast_cls.target if isinstance(ast_cls, ast.AnnAssign) else ast_cls.targets[0]
+
     @classmethod
-    def is_field(cls, ast_cls: ast.Assign) -> bool:
+    def is_field(cls, ast_cls: typing.Union[ast.Assign, ast.AnnAssign]) -> bool:
         """Check if `ast_cls` is an Odoo field."""
-        if isinstance(ast_cls, ast.Assign) and ast_cls.targets:
+        if (isinstance(ast_cls, ast.Assign) and ast_cls.targets) or (
+            isinstance(ast_cls, ast.AnnAssign) and isinstance(ast_cls.target, ast.Name)
+        ):
             if not isinstance(ast_cls.value, ast.Call):
                 return False
             field_type = cls._extract_type(ast_cls)
