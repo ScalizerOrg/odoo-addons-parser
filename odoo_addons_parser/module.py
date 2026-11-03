@@ -93,14 +93,12 @@ class ModuleParser:
     def _run_code_stats(self, file_path: os.PathLike):
         try:
             source_analysis = pygount.SourceAnalysis.from_file(
-                file_path,
+                str(file_path),  # pygount builds its messages by concatenating strings
                 group=self.folder_path.name,
                 encoding="utf-8",
             )
-        except Exception:
-            _logger.warning(
-                f"Unable to analyze {file_path}", stack_info=True, exc_info=True
-            )
+        except Exception as exc:
+            _logger.warning("Unable to analyze %s: %s", file_path, exc)
         else:
             self.summary.add(source_analysis)
 

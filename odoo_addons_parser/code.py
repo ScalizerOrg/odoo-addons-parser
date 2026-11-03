@@ -4,8 +4,13 @@
 
 import ast
 import pathlib
+import re
 import typing
 import xml.etree.ElementTree as ET
+
+# Encoding of an XML file, from its declaration (e.g. <?xml version="1.0" encoding="ISO-8859-1"?>)
+XML_DECLARATION_SIZE = 200
+XML_ENCODING_RE = re.compile(rb"""\s*<\?xml[^>]*?\bencoding\s*=\s*["']([A-Za-z0-9._-]+)["']""")
 
 
 BASE_CLASSES = [
@@ -60,14 +65,23 @@ class XMLFile:
 
     def _parse_file(self):
         try:
-            with open(self.path) as file_:
+            with open(self.path, "rb") as file_:
+                head = file_.read(XML_DECLARATION_SIZE)
+            match = XML_ENCODING_RE.match(head)
+            encoding = match.group(1).decode("ascii") if match else "utf-8"
+            with open(self.path, encoding=encoding) as file_:
                 lines = file_.readlines()
+            if not "".join(lines).strip():
+                # Empty file: no data
+                return lines, None
             return lines, ET.parse(self.path)
         except Exception as exc:
             raise RuntimeError(f"Unable to parse file {self.path}") from exc
 
     def _get_records(self) -> dict:
         res = {}
+        if self.xml_content is None:
+            return res
         for record in self.xml_content.findall('.//record'):
             res.setdefault(record.attrib.get('model'), [])
             data = {
@@ -93,6 +107,8 @@ class XMLFile:
 
     def _get_templates(self) -> dict:
         res = {}
+        if self.xml_content is None:
+            return res
         for record in self.xml_content.findall('.//template'):
             data = {att: record.attrib.get(att) for att in ('id', 'inherit_id', 'name', 'primary') if
              record.attrib.get(att)}
@@ -107,6 +123,8 @@ class XMLFile:
 
     def _get_menuitems(self) -> dict:
         res = {}
+        if self.xml_content is None:
+            return res
         for record in self.xml_content.findall('.//menuitem'):
             data = {att: record.attrib.get(att) for att in ('id', 'name') if record.attrib.get(att)}
             res[record.attrib.get('id')] = data
